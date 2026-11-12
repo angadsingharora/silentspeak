@@ -20,7 +20,7 @@ interface HoldProps {
 }
 
 /** Mouse/touch alternative to holding Space. */
-export function HoldButton({ title, isCapturing, enabled, hint = "Hold Space, or press and hold here", onBegin, onEnd }: HoldProps) {
+export function HoldButton({ title, isCapturing, enabled, hint = "hold Space, or click and hold", onBegin, onEnd }: HoldProps) {
   const [pressed, setPressed] = useState(false);
   const down = (e: PointerEvent<HTMLDivElement>) => {
     if (!enabled || pressed) return;
@@ -43,9 +43,8 @@ export function HoldButton({ title, isCapturing, enabled, hint = "Hold Space, or
       role="button"
       aria-pressed={isCapturing}
     >
-      <div className="glyph">{isCapturing ? "〰️" : "👄"}</div>
-      <div className="title">{isCapturing ? "Capturing…" : title}</div>
-      <div className="small muted">{hint}</div>
+      <div className="title">{isCapturing ? "capturing" : title}</div>
+      <div className="small muted">{isCapturing ? "release to finish" : hint}</div>
     </div>
   );
 }

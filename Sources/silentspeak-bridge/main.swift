@@ -336,7 +336,7 @@ source.start(onSample: { sample in
     server.broadcastStatus(Wire.status(state, message: message))
 })
 
-// Right ⌥ (keyCode 61) relayed as a push-to-mouth key. Global delivery needs Accessibility access.
+// Right ⌥ (keyCode 61) relayed as a capture key. Global delivery needs Accessibility access.
 let hotkeyCode: UInt16 = 61
 NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { event in
     guard event.keyCode == hotkeyCode else { return }

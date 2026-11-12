@@ -17,9 +17,7 @@ export function TrainView() {
       <Vocabulary />
       <div className="stack">
         <div className="stack" style={{ gap: 10 }}>
-          <p className="muted">
-            Silently mouth <b>“{word ?? "—"}”</b> while holding Space. Keep your head still; aim for 8–10 takes per word.
-          </p>
+          <p className="muted">Hold Space and silently mouth “{word ?? "—"}”. Keep your head still. 8–10 takes per word is plenty.</p>
           <HoldButton
             title={`Mouth “${word ?? "—"}”`}
             isCapturing={model.capture.isCapturing}
@@ -27,7 +25,7 @@ export function TrainView() {
             onBegin={() => model.capture.begin()}
             onEnd={() => model.capture.end()}
           />
-          {!streaming && <div className="notice small">Motion isn't streaming: {model.bridge.state === "connected" ? model.bridge.motion : "bridge not connected"}. See the Sensors tab.</div>}
+          {!streaming && <div className="notice">No motion yet ({model.bridge.state === "connected" ? model.bridge.motion : "bridge not running"}). See Sensors.</div>}
           {word && <ExpansionField word={word} />}
         </div>
         {word && <Takes word={word} />}
@@ -70,19 +68,19 @@ function Vocabulary() {
       </div>
       <div className="addword">
         <input type="text" placeholder="Add word" value={newWord} onChange={(e) => setNewWord(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
-        <button className="btn" onClick={add} disabled={!newWord.trim()}>+</button>
+        <button className="btn sm" onClick={add} disabled={!newWord.trim()}>add</button>
       </div>
-      <div className="wrap" style={{ marginTop: 12, gap: 6 }}>
-        <button className="btn sm" onClick={() => model.exportDataset()} disabled={model.dataset.templates.length === 0}>Export</button>
-        <button className="btn sm" onClick={() => pick(false)}>Import (merge)</button>
-        <button className="btn sm" onClick={() => pick(true)}>Import (replace)</button>
+      <div className="wrap small" style={{ marginTop: 12, gap: 10 }}>
+        <button className="icon" style={{ padding: 0 }} onClick={() => model.exportDataset()} disabled={model.dataset.templates.length === 0}>export</button>
+        <button className="icon" style={{ padding: 0 }} onClick={() => pick(false)}>import</button>
+        <button className="icon" style={{ padding: 0 }} onClick={() => pick(true)}>replace</button>
       </div>
       <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => {
         const file = e.target.files?.[0];
         if (file) void model.importDataset(file, replaceRef.current);
         e.target.value = "";
       }} />
-      <p className="small muted" style={{ marginTop: 10 }}>Dataset files are interchangeable with the native macOS app.</p>
+      <p className="small muted" style={{ marginTop: 8 }}>Same JSON as the native app.</p>
     </div>
   );
 }
@@ -94,11 +92,11 @@ function ExpansionField({ word }: { word: string }) {
   useEffect(() => { setText(model.dataset.expansions[word] ?? ""); }, [word]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <label className="field">
-      <span className="muted">Outputs as</span>
+      <span className="muted">outputs as</span>
       <input
         type="text"
         style={{ flex: 1 }}
-        placeholder={`“${word}” (set a phrase to expand it)`}
+        placeholder={`${word} (or a longer phrase)`}
         value={text}
         onChange={(e) => { setText(e.target.value); model.setExpansion(word, e.target.value); }}
       />
@@ -111,9 +109,9 @@ function Takes({ word }: { word: string }) {
   const takes = [...model.templatesFor(word)].reverse();
   return (
     <div className="card">
-      <h2>Takes for “{word}” ({takes.length})</h2>
+      <h2>{word}: {takes.length} takes</h2>
       {takes.length === 0
-        ? <p className="muted">No takes yet.</p>
+        ? <p className="muted">none yet</p>
         : (
           <div className="takes">
             {takes.map((t) => <TakeTile key={t.id} template={t} isNew={t.id === model.lastTemplateId} onDelete={() => model.deleteTemplate(t.id)} />)}
@@ -129,7 +127,7 @@ function TakeTile({ template, isNew, onDelete }: { template: Template; isNew: bo
       <SignalPlot samples={template.samples} channels={ROTATION} minScale={0.05} height={44} />
       <div className="foot">
         <span className="mono">{templateDuration(template).toFixed(2)} s · {template.samples.length}</span>
-        <button className="icon" title="Delete take" onClick={onDelete}>🗑</button>
+        <button className="icon" title="delete" onClick={onDelete}>×</button>
       </div>
     </div>
   );
@@ -141,24 +139,24 @@ function EvaluationPanel() {
   const toggle = (bit: number) => (on: boolean) => model.updateSettings({ featureSet: on ? featureSet | bit : featureSet & ~bit });
   return (
     <div className="card">
-      <h2>Is there signal? (leave-one-out + permutation test)</h2>
+      <h2>Evaluation</h2>
       <div className="stack" style={{ gap: 12 }}>
         <div className="wrap">
-          <span>Features:</span>
-          <FeatureToggle label="Acceleration" on={Boolean(featureSet & Feature.acceleration)} onChange={toggle(Feature.acceleration)} />
-          <FeatureToggle label="Rotation" on={Boolean(featureSet & Feature.rotation)} onChange={toggle(Feature.rotation)} />
-          <FeatureToggle label="Attitude" on={Boolean(featureSet & Feature.attitude)} onChange={toggle(Feature.attitude)} />
+          <span className="muted">features</span>
+          <FeatureToggle label="acceleration" on={Boolean(featureSet & Feature.acceleration)} onChange={toggle(Feature.acceleration)} />
+          <FeatureToggle label="rotation" on={Boolean(featureSet & Feature.rotation)} onChange={toggle(Feature.rotation)} />
+          <FeatureToggle label="attitude" on={Boolean(featureSet & Feature.attitude)} onChange={toggle(Feature.attitude)} />
           <Stepper label="k =" value={k} min={1} max={9} onChange={(v) => model.updateSettings({ k: v })} />
           <span className="spacer" />
           <button className="btn primary" onClick={() => model.evaluate()} disabled={model.isEvaluating || featureSet === 0}>
-            {model.isEvaluating ? `Evaluating… ${Math.round(model.evaluationProgress * 100)}%` : "Evaluate"}
+            {model.isEvaluating ? `${Math.round(model.evaluationProgress * 100)}%` : "evaluate"}
           </button>
         </div>
         {model.evaluation
           ? <EvaluationResult result={model.evaluation} />
           : (
             <p className="small muted">
-              Needs ≥ 2 words with ≥ 2 takes each. Each take is classified against all the others; the same is repeated with shuffled labels to show what chance looks like.
+              Leave-one-out accuracy, then the same with labels shuffled 500 times. Needs two words with two takes each.
             </p>
           )}
       </div>
@@ -181,20 +179,20 @@ function EvaluationResult({ result }: { result: Evaluation }) {
   return (
     <div className="stack" style={{ gap: 10 }}>
       <div className="metrics">
-        <Metric label="Accuracy" value={pct(result.accuracy)} highlight />
-        <Metric label="Chance" value={pct(result.chance)} />
-        <Metric label="Shuffled 95th pct" value={pct(result.permutationP95)} />
-        <Metric label="p-value" value={result.pValue < 0.001 ? "< 0.001" : result.pValue.toFixed(3)} />
+        <Metric label="accuracy" value={pct(result.accuracy)} />
+        <Metric label="chance" value={pct(result.chance)} />
+        <Metric label="shuffled, 95th pct" value={pct(result.permutationP95)} />
+        <Metric label="p" value={result.pValue < 0.001 ? "< 0.001" : result.pValue.toFixed(3)} />
       </div>
       <p className={significant ? "ok" : "warn"}>
         {significant
-          ? `Motion carries word information beyond chance across ${result.templateCount} takes (k = ${result.k}).`
-          : "Not distinguishable from chance yet — record more takes or try other feature sets."}
+          ? `Better than chance over ${result.templateCount} takes, k = ${result.k}.`
+          : "Not better than chance yet. More takes, or try other features."}
       </p>
       <table className="confusion">
         <thead>
           <tr>
-            <th className="muted">actual ↓ / predicted →</th>
+            <th>actual \ predicted</th>
             {result.labels.map((l) => <th key={l}>{l}</th>)}
           </tr>
         </thead>
@@ -222,9 +220,9 @@ function EvaluationResult({ result }: { result: Evaluation }) {
   );
 }
 
-function Metric({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`metric ${highlight ? "highlight" : ""}`}>
+    <div className="metric">
       <div className="label">{label}</div>
       <div className="value mono">{value}</div>
     </div>

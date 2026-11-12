@@ -5,39 +5,34 @@ import { SensorsView } from "./components/SensorsView";
 import { TrainView } from "./components/TrainView";
 
 const SCREENS: { id: Screen; label: string }[] = [
-  { id: "sensors", label: "Sensors" },
-  { id: "train", label: "Train" },
-  { id: "decode", label: "Decode" },
+  { id: "sensors", label: "sensors" },
+  { id: "train", label: "train" },
+  { id: "decode", label: "decode" },
 ];
 
 export function App() {
   const model = useModel();
   const { bridge } = model;
-  const dot = bridge.state !== "connected" ? "red" : bridge.motion === "streaming" ? "green" : "orange";
+  const tone = bridge.state !== "connected" ? "bad" : bridge.motion === "streaming" ? "live" : "";
   const status = bridge.state !== "connected"
-    ? (bridge.state === "connecting" ? "Connecting to bridge…" : "Bridge not connected")
+    ? (bridge.state === "connecting" ? "connecting to bridge" : "bridge not running")
     : bridge.motion === "streaming"
-      ? `${bridge.info?.simulated ? "Simulated" : "AirPods"} · ${Math.round(model.sampleRate)} Hz`
-      : bridge.motion === "waiting" ? "Waiting for AirPods" : bridge.motion;
+      ? `${bridge.info?.simulated ? "simulated" : "AirPods"}, ${Math.round(model.sampleRate)} Hz`
+      : bridge.motion === "waiting" ? "waiting for AirPods" : bridge.motion;
 
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">
-          <span className="logo" aria-hidden>
-            <svg width="16" height="16" viewBox="0 0 32 32"><path d="M8 17q8-7 16 0" stroke="white" strokeWidth="3.5" fill="none" strokeLinecap="round" /></svg>
-          </span>
-          SilentSpeak
-        </div>
+        <div className="brand">silentspeak</div>
         <nav className="nav">
           {SCREENS.map((s) => (
             <button key={s.id} className={model.screen === s.id ? "active" : ""} onClick={() => model.setScreen(s.id)}>{s.label}</button>
           ))}
         </nav>
         <span className="spacer" />
-        <span className="badge mono"><span className={`dot ${dot}`} />{status}</span>
+        <span className={`status ${tone}`}>{status}</span>
       </header>
-      <main className="content">
+      <main>
         {model.screen === "sensors" && <SensorsView />}
         {model.screen === "train" && <TrainView />}
         {model.screen === "decode" && <DecodeView />}

@@ -83,7 +83,7 @@ export function SignalPlot({ title, samples, channels, span, minScale = 0.02, he
         <div className="legend">
           <span className="title">{title}</span>
           {channels.map((c) => (
-            <span key={c.name} style={{ color: c.color }}>● {c.name}</span>
+            <span key={c.name} style={{ color: c.color }}>{c.name}</span>
           ))}
           <span className="spacer" />
           <span className="muted mono">±{scale.toFixed(3)}</span>

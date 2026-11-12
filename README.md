@@ -1,110 +1,62 @@
-# SilentSpeak
+# silentspeak
 
-Mouth a word without making a sound. Your AirPods Pro feel your jaw move. SilentSpeak turns that motion into text, speaks it back, or types it into whatever app you're using.
+Silent speech input from AirPods Pro. You mouth a word without voicing it, the AirPods' motion sensors pick up the jaw and head movement, and a small template matcher turns it into text. It can then speak the word out loud or type it into whatever app is in front.
 
-It's built on the idea behind [subvox](https://github.com/joeblau/subvox) by Joe Blau: AirPods head-motion data (`CMHeadphoneMotionManager`) carries enough information to tell a handful of silently mouthed words apart. SilentSpeak keeps that experiment honest (the statistics are still there) and makes it usable as an input method.
+This started as Joe Blau's [subvox](https://github.com/joeblau/subvox), which showed the signal is actually there. This is my version of it.
 
-No language model, no cloud inference. A small-vocabulary template recognizer that you train yourself in a minute.
+Live at https://silentspeak-theta.vercel.app
 
-Two ways to run it:
+## How it's put together
 
-| | Web app + bridge (recommended) | Native macOS app |
-|---|---|---|
-| UI | `web/`, React + Vite, deploys to Vercel | `SilentSpeak/`, SwiftUI, needs Xcode |
-| Motion | `silentspeak-bridge`, a tiny native helper streaming AirPods motion over a loopback WebSocket | read directly |
-| Engine | TypeScript port in `web/src/engine` | `SilentSpeakCore` Swift package |
-| Output | speech (Web Speech API), typing and global hotkey via the bridge | speech, typing, global hotkey |
-| Data | browser storage + JSON export | `~/Library/Application Support/SilentSpeak/dataset.json` |
+Browsers can't read AirPods motion, so there are two parts.
 
-Dataset files are interchangeable between the two.
+`silentspeak-bridge` is a small Swift command-line tool that runs on your Mac. It reads headphone motion through CoreMotion and serves it over a WebSocket on 127.0.0.1:8765. It also relays the Right Option key and, if you let it, types text into the front app.
 
-## Web app + bridge
+The web app in `web/` does everything else: recording takes, matching, evaluation, speech, storage. It's React + Vite + TypeScript and deploys to Vercel.
 
-Browsers can't read AirPods motion, so one small native piece stays on your Mac: the bridge. It binds only to `127.0.0.1`, streams motion samples as JSON, relays the Right ⌥ key, and types text into the front app when the web app asks. Everything else (training, DTW matching, evaluation, speech, storage) runs in the browser.
+There's also a native macOS app in `SilentSpeak/` that doesn't need the bridge, sharing the Swift engine in `Sources/SilentSpeakCore`. It needs Xcode to build.
 
-```sh
-# 1. The bridge (needs only Xcode Command Line Tools)
-swift run silentspeak-bridge            # add --simulate to try it without AirPods
+## Running it
 
-# 2. The web app
-cd web && npm install && npm run dev    # http://localhost:5173
-```
+Bridge (needs the Xcode Command Line Tools, nothing else):
 
-The page connects to `ws://127.0.0.1:8765` on its own. Grant **Motion** access to your terminal app when macOS asks; for typing into other apps and the global Right ⌥ key, also grant it **Accessibility** access (System Settings › Privacy & Security), then restart the bridge.
+    swift run silentspeak-bridge --origin https://silentspeak-theta.vercel.app
 
-### Hosted on Vercel
+then open the site in Chrome. Or run the web app locally:
 
-The web app is live at **https://silentspeak-theta.vercel.app**. To use it, run the bridge on your Mac with that origin allowed:
+    cd web && npm install && npm run dev
 
-```sh
-swift run silentspeak-bridge --origin https://silentspeak-theta.vercel.app
-```
+and the bridge without `--origin` (localhost is always allowed). Add `--simulate` to try it without AirPods.
 
-The bridge admits `localhost` dev servers automatically and rejects every other origin, so a random website can't read your motion or type on your Mac. Use Chrome or Firefox for the hosted app: they allow a page on HTTPS to open a WebSocket to `127.0.0.1`. Safari and some embedded browsers block it.
+macOS will ask to give your terminal access to Motion. Typing into other apps and the Right Option key also need Accessibility access for the terminal, then restart the bridge.
 
-To deploy your own copy, import the repo in Vercel (`vercel.json` already points the build at `web/`) or run `vercel deploy --prod` from the repo root.
-
-### Bridge options
-
-```
-silentspeak-bridge [--port 8765] [--origin URL]... [--simulate] [--no-type]
-```
-
-`--simulate` fakes AirPods: resting noise with a short burst every couple of seconds (and whenever Right ⌥ is held). `--no-type` refuses typing requests entirely.
-
-## Native macOS app
-
-```sh
-brew install xcodegen   # once
-xcodegen generate
-open SilentSpeak.xcodeproj   # ⌘R
-```
-
-Set `DEVELOPMENT_TEAM` in `project.yml` (or pick a team in Xcode's Signing settings). Requires macOS 14+ and AirPods Pro (or other headphones with head tracking) connected as the Mac's audio output. The native app additionally records experiment sessions (motion CSV, audio, labelled events) to `~/Documents/SilentSpeak/Sessions/` and shows a live microphone transcript for comparison.
-
-The engine and its tests don't need Xcode:
-
-```sh
-swift test
-swift run silentspeak-eval                  # evaluates the native app's dataset
-swift run silentspeak-eval my.json --ablate # compares every feature-set combination
-cd web && npm test                          # the TypeScript engine's tests
-```
+The bridge only binds loopback and only accepts pages from localhost or origins you pass with `--origin`, so some random site can't read your motion or type on your Mac. Chrome and Firefox allow an HTTPS page to open a WebSocket to 127.0.0.1. Safari doesn't.
 
 ## Using it
 
-1. **Train.** Pick a word, hold **Space**, mouth it silently, release. Aim for 8 to 10 takes per word. Optionally set what the word *outputs as* (a phrase, a sentence, an emoji).
-2. **Evaluate.** Press **Evaluate**. Leave-one-out accuracy is compared with the same procedure on shuffled labels, 500 times. If p < 0.05, your motion stream really does distinguish those words. Toggle acceleration / rotation / attitude and k to see what carries the signal.
-3. **Decode.** Hold Space and mouth a word. Turn on **Speak decoded words** to hear it, or **Type into front app**, enable **Right ⌥ push-to-mouth**, switch to any app, hold Right Option and mouth away.
+Train: pick a word, hold Space, mouth it, let go. 8–10 takes per word. You can give a word a longer output, so mouthing "brb" types "be right back".
 
-In the web app, `window.silentspeak` is the live model if you want to poke at it from the console.
+Evaluate: runs leave-one-out classification and compares it to 500 runs with shuffled labels. If p is under 0.05 your words are distinguishable. The feature checkboxes let you see which channels carry the signal; for me it's mostly rotation.
+
+Decode: hold Space (or Right Option from any app) and mouth a word. Turn on speak or type.
+
+`window.silentspeak` is the live model in the web app if you want to poke at it.
 
 ## How decoding works
 
-1. **Segmentation** (`capture.ts` / `CaptureController`). Space or Right ⌥ held, or an energy trigger above a calibrated noise floor with pre-roll and hangover.
-2. **Features** (`motion.ts` / `MotionFeatures`). Per frame: user acceleration (3), rotation rate (3), attitude change since the start of the segment (3). Each channel is mean-centred and quiet lead-in / lead-out frames are trimmed.
-3. **Matching** (`dtw.ts`, `classifier.ts` / `TemplateClassifier`). Channels are z-scaled across the training set. The segment is DTW-matched (Sakoe–Chiba band) against every take. The k nearest takes vote, each weighted by 1/distance, with every word's closest take always in the pool so the runner-up is real. A segment is rejected if the best distance exceeds *max distance* or the vote margin is below *min confidence*.
-4. **Is it real?** (`evaluation.ts` / `Evaluation`). Leave-one-out accuracy under the same k-NN rule, against a 500× label-permutation null. The web app runs this in a Web Worker.
+A segment is the motion while the key is held (or, in auto mode, while energy is above a calibrated noise floor). Per frame it becomes a 9-dim vector: user acceleration, rotation rate, and attitude change since the segment started, each mean-centred, with quiet frames trimmed off both ends. Channels are z-scaled over the training set.
 
-## Files
+Matching is DTW with a Sakoe–Chiba band against every recorded take. The k nearest takes vote, weighted by 1/distance, with each word's closest take always included so the runner-up margin means something. A segment is rejected if the best distance is too large or the vote margin too small.
 
-| Path | What |
-|---|---|
-| `web/src/engine` | TypeScript engine: motion features, DTW, k-NN classifier, evaluation, dataset model, capture controller |
-| `web/src` | Bridge client, app model, React views |
-| `Sources/silentspeak-bridge` | The native motion bridge |
-| `Sources/SilentSpeakCore` | Swift engine (same algorithms) used by the native app and CLI |
-| `Sources/silentspeak-eval` | Command-line evaluator |
-| `SilentSpeak/` | Native macOS app |
-| `Tests/`, `web/src/engine/__tests__` | Swift Testing and Vitest suites |
+The evaluation runs the same thing leave-one-out and then with permuted labels to get a p-value. In the web app that's in a Web Worker.
 
-## Known limits
+## Other bits
 
-- Headphone motion is processed and low-rate (roughly 25 Hz on AirPods). Expect jaw and head movement, not vocal vibration.
-- Templates are user- and session-specific. Re-seating the AirPods can shift the signal. Export a dataset before you lose a good one.
-- The bridge is a command-line tool, so macOS attributes its Motion and Accessibility permissions to the terminal app that runs it.
-- The default thresholds are starting points. If noise gets accepted, lower *max distance* or raise *min confidence*.
+- `swift run silentspeak-eval dataset.json --ablate` evaluates a dataset from the terminal and compares feature sets.
+- `swift test` and `cd web && npm test` run the two engines' tests.
+- Dataset JSON is the same between the web and native apps, so you can export from one and import into the other.
+- Motion is ~25 Hz and already filtered on the AirPods. You're seeing jaw and head movement, not anything acoustic. Templates drift if you re-seat the AirPods.
 
 ## License
 
-MIT. Based on subvox, © Joe Blau, also MIT. See `LICENSE`.
+MIT. subvox is © Joe Blau, also MIT.

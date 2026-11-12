@@ -14,59 +14,56 @@ export function SensorsView() {
         <div className="card">
           <h2>Bridge</h2>
           <div className="stack" style={{ gap: 8 }}>
-            <div>Status: <b>{bridge.state}</b> <span className="muted mono">{bridge.url}</span></div>
+            <div>{bridge.state} <span className="muted mono">{bridge.url}</span></div>
             {bridge.info && (
               <div className="small muted">
-                {bridge.info.simulated ? "Simulated motion (no AirPods). " : ""}
-                Typing {bridge.info.typing ? "enabled" : "disabled"}; Accessibility {bridge.info.accessibility ? "granted" : "not granted"}.
+                {bridge.info.simulated ? "simulated motion, " : ""}
+                typing {bridge.info.typing ? "on" : "off"}, accessibility {bridge.info.accessibility ? "granted" : "not granted"}
               </div>
             )}
             <div className="wrap">
               <label className="field">
-                Port
+                port
                 <input type="number" value={port} onChange={(e) => setPort(e.target.value)} style={{ width: 90 }} />
               </label>
-              <button className="btn sm" onClick={() => bridge.setPort(Number(port))}>Apply</button>
+              <button className="btn sm" onClick={() => bridge.setPort(Number(port))}>set</button>
               {bridge.state === "disconnected"
-                ? <button className="btn sm primary" onClick={() => bridge.connect()}>Connect</button>
-                : <button className="btn sm" onClick={() => bridge.disconnect()}>Disconnect</button>}
+                ? <button className="btn sm" onClick={() => bridge.connect()}>connect</button>
+                : <button className="btn sm" onClick={() => bridge.disconnect()}>disconnect</button>}
             </div>
             {bridge.state !== "connected" && (
-              <div className="notice info small">
-                Start the bridge on this Mac, then this page connects on its own:
-                <pre className="code" style={{ marginTop: 6 }}>swift run silentspeak-bridge</pre>
-                <span>Add <code>--simulate</code> to try the app without AirPods.</span>
+              <div className="notice">
+                Run the bridge on this Mac; the page connects by itself.
+                <pre className="code">swift run silentspeak-bridge --origin {location.origin}</pre>
+                <code>--simulate</code> fakes the AirPods.
               </div>
             )}
           </div>
         </div>
 
         <div className="card">
-          <h2>AirPods motion</h2>
-          <div className="stack mono" style={{ gap: 6 }}>
-            <div>Status: <b>{bridge.motion}</b>{bridge.motionMessage ? <span className="muted"> · {bridge.motionMessage}</span> : null}</div>
-            <div>Sample rate: {model.sampleRate.toFixed(1)} Hz</div>
-            <div>Samples: {model.sampleCount}</div>
-            {model.latest && <div>Gravity: {model.latest.gx.toFixed(2)}, {model.latest.gy.toFixed(2)}, {model.latest.gz.toFixed(2)}</div>}
+          <h2>Motion</h2>
+          <div className="stack mono" style={{ gap: 4 }}>
+            <div>{bridge.motion}{bridge.motionMessage ? <span className="muted"> — {bridge.motionMessage}</span> : null}</div>
+            <div>{model.sampleRate.toFixed(1)} Hz, {model.sampleCount} samples</div>
+            {model.latest && <div>gravity {model.latest.gx.toFixed(2)}, {model.latest.gy.toFixed(2)}, {model.latest.gz.toFixed(2)}</div>}
             {bridge.motion === "waiting" && (
-              <p className="small muted" style={{ fontFamily: "inherit" }}>Put in AirPods Pro and make sure they're the active output on this Mac.</p>
+              <p className="small muted" style={{ fontFamily: "inherit" }}>AirPods need to be the Mac's audio output.</p>
             )}
           </div>
         </div>
       </div>
 
       <div className="card">
-        <h2>Live motion (last 8 s)</h2>
+        <h2>Last 8 s</h2>
         <div className="stack" style={{ gap: 12 }}>
-          <SignalPlot title="User acceleration (g)" samples={model.history} channels={ACCELERATION} span={span} minScale={0.01} />
-          <SignalPlot title="Rotation rate (rad/s)" samples={model.history} channels={ROTATION} span={span} minScale={0.05} />
-          <SignalPlot title="Attitude (rad)" samples={model.history} channels={ATTITUDE} span={span} minScale={0.1} />
+          <SignalPlot title="acceleration (g)" samples={model.history} channels={ACCELERATION} span={span} minScale={0.01} />
+          <SignalPlot title="rotation (rad/s)" samples={model.history} channels={ROTATION} span={span} minScale={0.05} />
+          <SignalPlot title="attitude (rad)" samples={model.history} channels={ATTITUDE} span={span} minScale={0.1} />
         </div>
       </div>
 
-      <div className="card soft small muted">
-        Experiment recordings (motion CSV + audio + labelled events) are a feature of the native macOS app in this repo. The web app keeps everything in your browser and in exported dataset files.
-      </div>
+      <p className="small muted">Session recording to CSV/audio is only in the native app.</p>
     </div>
   );
 }

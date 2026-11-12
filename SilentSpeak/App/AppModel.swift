@@ -27,7 +27,7 @@ final class AppModel {
         }
     }
 
-    /// Right Option: the push-to-mouth key that works from any app.
+    /// Right Option: the capture key that works from any app.
     static let hotkeyCode: UInt16 = 61
     static let hotkeyName = "Right ⌥"
 

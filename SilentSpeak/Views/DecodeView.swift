@@ -63,7 +63,7 @@ struct DecodeView: View {
                 }
                 .font(.callout)
                 if model.hotkeyEnabled {
-                    Text("\(AppModel.hotkeyName) is live: hold it in any app to mouth a word.")
+                    Text("Hold \(AppModel.hotkeyName) in any app to capture.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -219,7 +219,7 @@ private struct OutputPanel: View {
                 HStack(spacing: 20) {
                     Toggle("Speak decoded words", isOn: $output.speaks)
                     Toggle("Type into front app", isOn: $output.types)
-                    Toggle("\(AppModel.hotkeyName) push-to-mouth from any app", isOn: $model.hotkeyEnabled)
+                    Toggle("\(AppModel.hotkeyName) from any app", isOn: $model.hotkeyEnabled)
                     Spacer()
                     Button("Test voice") { model.output.speak(model.dataset.vocabulary.first ?? "hello") }
                         .disabled(!output.speaks)
