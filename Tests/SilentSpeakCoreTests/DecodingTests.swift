@@ -107,3 +107,30 @@ import Testing
         #expect(FeatureSet.all.names == ["acceleration", "rotation", "attitude"])
     }
 }
+
+@Suite struct CaptureTests {
+    @MainActor @Test func tapWithoutHeldSamplesRecordsNothing() {
+        let capture = CaptureController()
+        var segments: [[MotionSample]] = []
+        capture.onSegment = { segments.append($0) }
+        for i in 0..<25 { capture.ingest(MotionSample(t: Double(i) / 25, rotation: (0.2, 0, 0))) }
+        for _ in 0..<50 { capture.begin(); capture.end() }
+        #expect(segments.isEmpty)
+        capture.begin()
+        for i in 25..<40 { capture.ingest(MotionSample(t: Double(i) / 25, rotation: (0.2, 0, 0))) }
+        capture.end()
+        #expect(segments.count == 1)
+    }
+
+    @MainActor @Test func streamGapDropsStalePreroll() {
+        let capture = CaptureController()
+        var segments: [[MotionSample]] = []
+        capture.onSegment = { segments.append($0) }
+        for i in 0..<25 { capture.ingest(MotionSample(t: Double(i) / 25, rotation: (0.2, 0, 0))) }
+        capture.begin()
+        for i in 0..<10 { capture.ingest(MotionSample(t: 100 + Double(i) / 25, rotation: (0.2, 0, 0))) }
+        capture.end()
+        #expect(segments.count == 1)
+        #expect(segments[0].allSatisfy { $0.t >= 100 })
+    }
+}

@@ -50,6 +50,18 @@ Matching is DTW with a Sakoe–Chiba band against every recorded take. The k nea
 
 The evaluation runs the same thing leave-one-out and then with permuted labels to get a p-value. In the web app that's in a Web Worker.
 
+## Trying it with real AirPods
+
+1. Put the AirPods in and make sure they're the Mac's audio output (sound menu).
+2. In a terminal: `cd ~/silentspeak && swift run silentspeak-bridge --origin https://silentspeak-theta.vercel.app`. Approve the Motion prompt. The log should say `motion: streaming` once the AirPods connect. If it says `waiting`, re-select them as output.
+3. Open https://silentspeak-theta.vercel.app in Chrome. Top right should say "AirPods, 25 Hz". The sensors tab shows live plots; nod and you should see it.
+4. Train: start with two very different words, say "yes" and "stop". Hold Space, mouth the word with a bit of exaggeration, release. 8 takes each, head still, same sitting position. Watch the little plots: takes of the same word should look alike.
+5. Evaluate. With two clearly different words you want accuracy well above chance and p under 0.05. If it's at chance, the takes are probably too subtle; mouth bigger, or untick acceleration/attitude and keep rotation only.
+6. Decode: hold Space, mouth a word. The "last segment" box shows the distance per word. If the right word wins but gets rejected, raise max distance; if wrong words get accepted, lower it or raise min confidence.
+7. Tick speak to hear it. For typing: grant Accessibility to the terminal, restart the bridge, tick "type into front app" and "Right Option from any app", click into Notes or wherever, hold Right Option and mouth a word.
+
+Things that will bite you: re-seating the AirPods changes the signal, so retrain or merge new takes after; talking out loud while training pollutes takes; and a quick tap of Space is ignored on purpose, you have to hold it through the word.
+
 ## Other bits
 
 - `swift run silentspeak-eval dataset.json --ablate` evaluates a dataset from the terminal and compares feature sets.

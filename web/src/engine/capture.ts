@@ -8,6 +8,7 @@ export const CAPTURE = {
   hangoverSeconds: 0.35,
   maxAutoSeconds: 3,
   maxHoldSeconds: 6,
+  gapSeconds: 1,
 };
 
 /**
@@ -32,6 +33,8 @@ export class CaptureController {
   private calibration: number[] = [];
   private calibrationEnd: number | null = null;
   private quietSince: number | null = null;
+  private lastT: number | null = null;
+  private heldFrom = 0;
 
   get threshold(): number | null {
     return this.noiseFloor === null ? null : this.noiseFloor * this.triggerRatio;
@@ -47,6 +50,7 @@ export class CaptureController {
     this.isManual = true;
     this.isCapturing = true;
     this.buffer = [...this.preroll];
+    this.heldFrom = this.buffer.length;
     this.onChange?.();
   }
 
@@ -63,6 +67,15 @@ export class CaptureController {
   }
 
   ingest(sample: MotionSample): void {
+    // A gap in the stream (bridge reconnect, AirPods dropout) makes everything
+    // before it useless as context for what comes after.
+    if (this.lastT !== null && Math.abs(sample.t - this.lastT) > CAPTURE.gapSeconds) {
+      this.preroll = [];
+      this.buffer = [];
+      this.heldFrom = 0;
+      this.quietSince = null;
+    }
+    this.lastT = sample.t;
     const e = energy(sample);
     this.energy = this.energy * 0.6 + e * 0.4;
 
@@ -108,12 +121,14 @@ export class CaptureController {
 
   private finish(): void {
     const segment = this.buffer;
+    const held = this.isManual ? segment.length - this.heldFrom : segment.length;
     this.buffer = [];
     this.isCapturing = false;
     this.isManual = false;
     this.quietSince = null;
     this.onChange?.();
-    if (segment.length < 4) return;
+    // A tap that captured nothing but pre-roll is not a word.
+    if (segment.length < 4 || held < 4) return;
     if (segment[segment.length - 1].t - segment[0].t < 0.15) return;
     this.onSegment?.(segment);
   }

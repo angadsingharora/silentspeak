@@ -77,6 +77,7 @@ export class AppModel {
   private rateWindow: number[] = [];
   private worker: Worker | null = null;
   private statusTimer: number | null = null;
+  private saveTimer: number | null = null;
   private started = false;
 
   constructor() {
@@ -124,6 +125,7 @@ export class AppModel {
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
     window.addEventListener("blur", () => this.capture.end());
+    window.addEventListener("pagehide", () => this.flushSave());
   }
 
   setScreen(screen: Screen): void {
@@ -280,7 +282,7 @@ export class AppModel {
     if (text.trim()) expansions[word] = text;
     else delete expansions[word];
     this.dataset = { ...this.dataset, expansions };
-    saveDataset(this.dataset);
+    this.scheduleSave();
     this.notify();
   }
 
@@ -296,9 +298,22 @@ export class AppModel {
   }
 
   private persist(): void {
-    if (!saveDataset(this.dataset)) this.setStatus("Couldn't save to browser storage. Export your dataset to keep it.");
+    this.scheduleSave();
     this.rebuildClassifier();
     this.notify();
+  }
+
+  /** Serialising a few MB on every take adds up, so writes trail the last change by a moment. */
+  private scheduleSave(): void {
+    if (this.saveTimer !== null) clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => this.flushSave(), 300);
+  }
+
+  flushSave(): void {
+    if (this.saveTimer === null) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    if (!saveDataset(this.dataset)) this.setStatus("Couldn't save to browser storage. Export your dataset to keep it.");
   }
 
   private rebuildClassifier(): void {

@@ -16,6 +16,7 @@ public final class CaptureController {
     public static let hangoverSeconds: TimeInterval = 0.35
     public static let maxAutoSeconds: TimeInterval = 3
     public static let maxHoldSeconds: TimeInterval = 6
+    public static let gapSeconds: TimeInterval = 1
 
     public var autoEnabled = false {
         didSet { if !autoEnabled, isCapturing, !isManual { finish() } }
@@ -37,6 +38,8 @@ public final class CaptureController {
     @ObservationIgnored private var calibration: [Double] = []
     @ObservationIgnored private var calibrationEnd: TimeInterval?
     @ObservationIgnored private var quietSince: TimeInterval?
+    @ObservationIgnored private var lastT: TimeInterval?
+    @ObservationIgnored private var heldFrom = 0
 
     public init() {}
 
@@ -45,6 +48,7 @@ public final class CaptureController {
         isManual = true
         isCapturing = true
         buffer = preroll
+        heldFrom = buffer.count
     }
 
     public func end() {
@@ -59,6 +63,15 @@ public final class CaptureController {
     }
 
     public func ingest(_ sample: MotionSample) {
+        // A gap in the stream (AirPods dropout) makes everything before it useless
+        // as context for what comes after.
+        if let lastT, abs(sample.t - lastT) > Self.gapSeconds {
+            preroll = []
+            buffer = []
+            heldFrom = 0
+            quietSince = nil
+        }
+        lastT = sample.t
         let e = MotionFeatures.energy(sample)
         energy = energy * 0.6 + e * 0.4
 
@@ -103,11 +116,13 @@ public final class CaptureController {
 
     private func finish() {
         let segment = buffer
+        let held = isManual ? segment.count - heldFrom : segment.count
         buffer = []
         isCapturing = false
         isManual = false
         quietSince = nil
-        guard segment.count >= 4, let first = segment.first, let last = segment.last, last.t - first.t >= 0.15 else { return }
+        // A tap that captured nothing but pre-roll is not a word.
+        guard segment.count >= 4, held >= 4, let first = segment.first, let last = segment.last, last.t - first.t >= 0.15 else { return }
         onSegment?(segment)
     }
 }

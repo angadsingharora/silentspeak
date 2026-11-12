@@ -306,8 +306,9 @@ app.setActivationPolicy(.prohibited)
 server.onCommand = { object, connection in
     switch object["type"] as? String {
     case "type":
+        // Bounded so an allowed page can't flood the front app with key events.
         let text = object["text"] as? String ?? ""
-        let ok = options.typing && Typist.type(text)
+        let ok = options.typing && !text.isEmpty && text.count <= 500 && Typist.type(text)
         server.send(Wire.encode(["type": "typed", "ok": ok, "accessibility": AXIsProcessTrusted()]), to: connection)
         if !ok, !AXIsProcessTrusted() {
             log("typing needs Accessibility access for your terminal app (System Settings › Privacy & Security › Accessibility)")
