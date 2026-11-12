@@ -32,15 +32,17 @@ cd web && npm install && npm run dev    # http://localhost:5173
 
 The page connects to `ws://127.0.0.1:8765` on its own. Grant **Motion** access to your terminal app when macOS asks; for typing into other apps and the global Right ⌥ key, also grant it **Accessibility** access (System Settings › Privacy & Security), then restart the bridge.
 
-### Deploying to Vercel
+### Hosted on Vercel
 
-Import this repo in Vercel; `vercel.json` already points the build at `web/`. Then run the bridge with your deployment's origin allowed:
+The web app is live at **https://silentspeak-theta.vercel.app**. To use it, run the bridge on your Mac with that origin allowed:
 
 ```sh
-swift run silentspeak-bridge --origin https://your-app.vercel.app
+swift run silentspeak-bridge --origin https://silentspeak-theta.vercel.app
 ```
 
-The bridge admits `localhost` dev servers automatically and rejects every other origin, so a random website can't read your motion or type on your Mac. Chrome and Firefox allow a page on HTTPS to open a WebSocket to `127.0.0.1`; Safari may not, so use Chrome for the hosted app.
+The bridge admits `localhost` dev servers automatically and rejects every other origin, so a random website can't read your motion or type on your Mac. Use Chrome or Firefox for the hosted app: they allow a page on HTTPS to open a WebSocket to `127.0.0.1`. Safari and some embedded browsers block it.
+
+To deploy your own copy, import the repo in Vercel (`vercel.json` already points the build at `web/`) or run `vercel deploy --prod` from the repo root.
 
 ### Bridge options
 
