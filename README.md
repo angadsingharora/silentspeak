@@ -14,11 +14,9 @@ Browsers can't read AirPods motion, so there are two parts.
 
 The web app in `web/` does everything else: recording takes, matching, evaluation, speech, storage. It's React + Vite + TypeScript and deploys to Vercel.
 
-There's also a native macOS app in `SilentSpeak/` that doesn't need the bridge, sharing the Swift engine in `Sources/SilentSpeakCore`. It needs Xcode to build.
-
 ## Running it
 
-Bridge (needs the Xcode Command Line Tools, nothing else):
+Bridge (needs the macOS Command Line Tools, which you likely have; `xcode-select --install` if not. No Xcode.):
 
     swift run silentspeak-bridge --origin https://silentspeak-theta.vercel.app
 
@@ -65,9 +63,10 @@ Things that will bite you: re-seating the AirPods changes the signal, so retrain
 ## Other bits
 
 - `swift run silentspeak-eval dataset.json --ablate` evaluates a dataset from the terminal and compares feature sets.
-- `swift test` and `cd web && npm test` run the two engines' tests.
-- Dataset JSON is the same between the web and native apps, so you can export from one and import into the other.
+- `swift test` and `cd web && npm test` run the tests.
+- Export your dataset from the train tab once you have a good one; it's a JSON file you can import later or on another machine.
 - Motion is ~25 Hz and already filtered on the AirPods. You're seeing jaw and head movement, not anything acoustic. Templates drift if you re-seat the AirPods.
+- `SilentSpeak/` is an older native macOS version of the same thing. It needs Xcode and isn't used by anything above.
 
 ## License
 
