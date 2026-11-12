@@ -1,0 +1,43 @@
+name: SilentSpeak
+options:
+  bundleIdPrefix: com.angadsingharora
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    # Set your Apple Development team to let Xcode sign automatically:
+    # DEVELOPMENT_TEAM: XXXXXXXXXX
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  SilentSpeakCore:
+    path: .
+targets:
+  SilentSpeak:
+    type: application
+    platform: macOS
+    sources: [SilentSpeak]
+    dependencies:
+      - package: SilentSpeakCore
+        product: SilentSpeakCore
+    info:
+      path: SilentSpeak/Info.plist
+      properties:
+        CFBundleDisplayName: SilentSpeak
+        LSApplicationCategoryType: public.app-category.utilities
+        NSMotionUsageDescription: SilentSpeak reads AirPods head-motion data to decode silently mouthed words into text.
+        NSMicrophoneUsageDescription: SilentSpeak records microphone audio alongside motion data and transcribes whispered speech for comparison.
+        NSSpeechRecognitionUsageDescription: SilentSpeak transcribes microphone audio on-device as a reference for the motion decoder.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.angadsingharora.silentspeak
+        CODE_SIGN_IDENTITY: Apple Development
+        ENABLE_HARDENED_RUNTIME: NO
+schemes:
+  SilentSpeak:
+    build:
+      targets:
+        SilentSpeak: all
