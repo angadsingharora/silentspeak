@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DEFAULT_AUGMENT } from "../engine/augment";
 import { templateDuration, type Template } from "../engine/classifier";
 import type { Evaluation } from "../engine/evaluation";
 import { Feature } from "../engine/motion";
@@ -17,7 +18,7 @@ export function TrainView() {
       <Vocabulary />
       <div className="stack">
         <div className="stack" style={{ gap: 10 }}>
-          <p className="muted">Hold Space and silently mouth “{word ?? "—"}”. Keep your head still. 8–10 takes per word is plenty.</p>
+          <p className="muted">Hold Space and silently mouth “{word ?? "—"}”. Keep your head still. With “extra takes” on, 3–5 per word may be enough; Evaluate will tell you.</p>
           <HoldButton
             title={`Mouth “${word ?? "—"}”`}
             isCapturing={model.capture.isCapturing}
@@ -135,7 +136,7 @@ function TakeTile({ template, isNew, onDelete }: { template: Template; isNew: bo
 
 function EvaluationPanel() {
   const model = useModel();
-  const { featureSet, k } = model.settings;
+  const { featureSet, k, augment } = model.settings;
   const toggle = (bit: number) => (on: boolean) => model.updateSettings({ featureSet: on ? featureSet | bit : featureSet & ~bit });
   return (
     <div className="card">
@@ -146,6 +147,10 @@ function EvaluationPanel() {
           <FeatureToggle label="acceleration" on={Boolean(featureSet & Feature.acceleration)} onChange={toggle(Feature.acceleration)} />
           <FeatureToggle label="rotation" on={Boolean(featureSet & Feature.rotation)} onChange={toggle(Feature.rotation)} />
           <FeatureToggle label="attitude" on={Boolean(featureSet & Feature.attitude)} onChange={toggle(Feature.attitude)} />
+          <label className="check" title="Add a few slightly varied copies of every take: tilted, louder or softer, faster or slower, with a little noise">
+            <input type="checkbox" checked={augment} onChange={(e) => model.updateSettings({ augment: e.target.checked })} />
+            extra takes
+          </label>
           <Stepper label="k =" value={k} min={1} max={9} onChange={(v) => model.updateSettings({ k: v })} />
           <span className="spacer" />
           <button className="btn primary" onClick={() => model.evaluate()} disabled={model.isEvaluating || featureSet === 0}>
@@ -187,8 +192,15 @@ function EvaluationResult({ result }: { result: Evaluation }) {
       <p className={significant ? "ok" : "warn"}>
         {significant
           ? `Better than chance over ${result.templateCount} takes, k = ${result.k}.`
-          : "Not better than chance yet. More takes, or try other features."}
+          : result.accuracy > result.chance && result.accuracy >= result.permutationP95
+            ? "Right on these takes, but there are too few to rule out luck. Add a take or two per word."
+            : "Not better than chance yet. More takes, or try other features."}
       </p>
+      {result.baselineAccuracy !== null && (
+        <p className="small muted">
+          With {DEFAULT_AUGMENT.copies} extra takes per take. Real takes only: {pct(result.baselineAccuracy)}.
+        </p>
+      )}
       <table className="confusion">
         <thead>
           <tr>

@@ -1,4 +1,5 @@
 import { BridgeClient } from "./bridge";
+import { DEFAULT_AUGMENT } from "./engine/augment";
 import { CaptureController, type CaptureMode } from "./engine/capture";
 import { TemplateClassifier, type Prediction, type Template } from "./engine/classifier";
 import { emptyDataset, loadDataset, merge, outputFor, parseDataset, saveDataset, serializeDataset, type Dataset } from "./engine/dataset";
@@ -23,6 +24,8 @@ const SETTINGS_KEY = "silentspeak.settings.v1";
 
 interface Settings {
   featureSet: FeatureSet;
+  /** Add synthetic copies of each take (see engine/augment.ts). */
+  augment: boolean;
   k: number;
   maxDistance: number;
   minConfidence: number;
@@ -34,6 +37,7 @@ interface Settings {
 
 const DEFAULT_SETTINGS: Settings = {
   featureSet: ALL_FEATURES,
+  augment: true,
   k: 3,
   maxDistance: 1.5,
   minConfidence: 0.1,
@@ -235,7 +239,9 @@ export class AppModel {
     const previous = this.settings;
     this.settings = { ...previous, ...patch };
     saveSettings(this.settings);
-    if (patch.featureSet !== undefined && patch.featureSet !== previous.featureSet) this.rebuildClassifier();
+    const rebuild = (patch.featureSet !== undefined && patch.featureSet !== previous.featureSet)
+      || (patch.augment !== undefined && patch.augment !== previous.augment);
+    if (rebuild) this.rebuildClassifier();
     if (patch.k !== undefined && patch.k !== previous.k) this.evaluation = null;
     this.notify();
   }
@@ -317,8 +323,12 @@ export class AppModel {
   }
 
   private rebuildClassifier(): void {
-    this.classifier = TemplateClassifier.build(this.dataset.templates, this.settings.featureSet);
+    this.classifier = TemplateClassifier.build(this.dataset.templates, this.settings.featureSet, this.augmentOptions);
     this.evaluation = null;
+  }
+
+  private get augmentOptions() {
+    return this.settings.augment ? DEFAULT_AUGMENT : null;
   }
 
   // MARK: Evaluation (off the main thread)
@@ -347,7 +357,7 @@ export class AppModel {
       this.isEvaluating = false;
       this.setStatus("Evaluation failed.");
     };
-    worker.postMessage({ templates: this.dataset.templates, featureSet: this.settings.featureSet, k: this.settings.k, permutations });
+    worker.postMessage({ templates: this.dataset.templates, featureSet: this.settings.featureSet, k: this.settings.k, permutations, augment: this.augmentOptions });
   }
 
   // MARK: Import / export

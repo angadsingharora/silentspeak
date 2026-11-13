@@ -1,3 +1,4 @@
+import { augmentations, type AugmentOptions } from "./augment";
 import { dtwDistance } from "./dtw";
 import { channelScales, frames, scaled, trim, type FeatureSet, type MotionSample } from "./motion";
 
@@ -77,25 +78,37 @@ export class TemplateClassifier {
   readonly labels: string[];
   private readonly entries: { label: string; frames: number[][] }[];
   private readonly scales: number[];
+  /** Real recorded takes; the rest of `entries` are synthetic copies. */
+  readonly templateCount: number;
 
-  private constructor(featureSet: FeatureSet, entries: { label: string; frames: number[][] }[], scales: number[]) {
+  private constructor(featureSet: FeatureSet, entries: { label: string; frames: number[][] }[], scales: number[], templateCount: number) {
     this.featureSet = featureSet;
     this.entries = entries;
     this.scales = scales;
+    this.templateCount = templateCount;
     this.labels = [...new Set(entries.map((e) => e.label))].sort();
   }
 
-  /** Returns null until there are takes for at least two words. */
-  static build(templates: Template[], featureSet: FeatureSet): TemplateClassifier | null {
+  /**
+   * Returns null until there are takes for at least two words. With `augment`, each take
+   * also gets synthetic copies (see augment.ts). Channel scales come from real takes only.
+   */
+  static build(templates: Template[], featureSet: FeatureSet, augment: AugmentOptions | null = null): TemplateClassifier | null {
     if (featureSet === 0) return null;
     if (new Set(templates.map((t) => t.label)).size < 2) return null;
     const raw = templates.map((t) => frames(trim(t.samples), featureSet));
     const scales = channelScales(raw);
     const entries = templates.map((t, i) => ({ label: t.label, frames: scaled(raw[i], scales) }));
-    return new TemplateClassifier(featureSet, entries, scales);
+    if (augment && augment.copies > 0) {
+      templates.forEach((t, i) => {
+        for (const copy of augmentations(raw[i], t.id, augment)) entries.push({ label: t.label, frames: scaled(copy, scales) });
+      });
+    }
+    return new TemplateClassifier(featureSet, entries, scales, templates.length);
   }
 
-  get templateCount(): number {
+  /** Real takes plus synthetic copies. */
+  get entryCount(): number {
     return this.entries.length;
   }
 

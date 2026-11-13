@@ -32,7 +32,7 @@ The bridge only binds loopback and only accepts pages from localhost or origins 
 
 ## Using it
 
-Train: pick a word, hold Space, mouth it, let go. 8–10 takes per word. You can give a word a longer output, so mouthing "brb" types "be right back".
+Train: pick a word, hold Space, mouth it, let go. 8–10 takes per word, or try 3–5 with "extra takes" on and check with Evaluate. You can give a word a longer output, so mouthing "brb" types "be right back".
 
 Evaluate: runs leave-one-out classification and compares it to 500 runs with shuffled labels. If p is under 0.05 your words are distinguishable. The feature checkboxes let you see which channels carry the signal; for me it's mostly rotation.
 
@@ -45,6 +45,8 @@ Decode: hold Space (or Right Option from any app) and mouth a word. Turn on spea
 A segment is the motion while the key is held (or, in auto mode, while energy is above a calibrated noise floor). Per frame it becomes a 9-dim vector: user acceleration, rotation rate, and attitude change since the segment started, each mean-centred, with quiet frames trimmed off both ends. Channels are z-scaled over the training set.
 
 Matching is DTW with a Sakoe–Chiba band against every recorded take. The k nearest takes vote, weighted by 1/distance, with each word's closest take always included so the runner-up margin means something. A segment is rejected if the best distance is too large or the vote margin too small.
+
+With "extra takes" on (the default), each recorded take also gets 4 synthetic copies: the sensor axes tilted a few degrees (like re-seating the AirPods), a bit bigger or smaller, a bit faster or slower, plus a little noise. They're seeded from the take's id, so they're the same every time. Evaluation keeps a held-out take's own copies out of its fold and also reports accuracy on real takes only, so you can see whether the copies help on your data.
 
 The evaluation runs the same thing leave-one-out and then with permuted labels to get a p-value. In the web app that's in a Web Worker.
 
