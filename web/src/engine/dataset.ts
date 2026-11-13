@@ -1,5 +1,5 @@
 import type { Template } from "./classifier";
-import type { MotionSample } from "./motion";
+import { LIP_DIMS, type MotionSample } from "./motion";
 
 /**
  * The user's vocabulary, every recorded take, and what each word should produce.
@@ -61,7 +61,7 @@ export function parseDataset(value: unknown): Dataset {
       for (const key of SAMPLE_KEYS) {
         if (typeof r[key] !== "number") throw new Error(`Take ${i} has a sample without "${key}".`);
       }
-      return {
+      const sample: MotionSample = {
         t: r.t as number,
         ax: r.ax as number, ay: r.ay as number, az: r.az as number,
         rx: r.rx as number, ry: r.ry as number, rz: r.rz as number,
@@ -70,6 +70,10 @@ export function parseDataset(value: unknown): Dataset {
         gy: typeof r.gy === "number" ? r.gy : 0,
         gz: typeof r.gz === "number" ? r.gz : -1,
       };
+      if (Array.isArray(r.lips) && r.lips.length === LIP_DIMS && r.lips.every((x) => typeof x === "number" && Number.isFinite(x))) {
+        sample.lips = r.lips as number[];
+      }
+      return sample;
     });
     return {
       id: typeof t.id === "string" ? t.id : crypto.randomUUID(),
@@ -100,7 +104,7 @@ export function serializeDataset(dataset: Dataset): string {
     id: t.id,
     label: t.label,
     createdAt: (new Date(t.createdAt).getTime() - Date.UTC(2001, 0, 1)) / 1000,
-    samples: t.samples.map((s) => ({ ...s, qw: 1, qx: 0, qy: 0, qz: 0 })),
+    samples: t.samples.map((s) => ({ ...s, lips: s.lips?.map((v) => Math.round(v * 1000) / 1000), qw: 1, qx: 0, qy: 0, qz: 0 })),
   }));
   return JSON.stringify({ vocabulary: dataset.vocabulary, templates, expansions: dataset.expansions });
 }

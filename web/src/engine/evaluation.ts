@@ -1,7 +1,7 @@
 import { augmentations, type AugmentOptions } from "./augment";
 import { vote, type Neighbour, type Template } from "./classifier";
 import { dtwDistance } from "./dtw";
-import { channelScales, frames, scaled, trim, type FeatureSet } from "./motion";
+import { channelScales, frames, motionDims, scaled, trim, type FeatureSet } from "./motion";
 
 export interface Evaluation {
   labels: string[];
@@ -66,7 +66,7 @@ export function evaluate(templates: Template[], options: EvaluationOptions, rand
   const augmented = Boolean(augment && augment.copies > 0);
   if (augmented) {
     templates.forEach((t, i) => {
-      for (const copy of augmentations(raw[i], t.id, augment!)) {
+      for (const copy of augmentations(raw[i], t.id, augment!, motionDims(featureSet))) {
         entries.push(scaled(copy, scales));
         source.push(i);
       }

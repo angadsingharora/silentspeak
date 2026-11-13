@@ -1,10 +1,12 @@
 import { BridgeClient } from "./bridge";
+import { FaceTracker } from "./camera";
 import { DEFAULT_AUGMENT } from "./engine/augment";
 import { CaptureController, type CaptureMode } from "./engine/capture";
 import { TemplateClassifier, type Prediction, type Template } from "./engine/classifier";
 import { emptyDataset, loadDataset, merge, outputFor, parseDataset, saveDataset, serializeDataset, type Dataset } from "./engine/dataset";
 import type { Evaluation } from "./engine/evaluation";
-import { ALL_FEATURES, type FeatureSet, type MotionSample } from "./engine/motion";
+import { GATE } from "./engine/face";
+import { ALL_FEATURES, Feature, makeSample, type FeatureSet, type MotionSample } from "./engine/motion";
 
 export type Screen = "sensors" | "train" | "decode";
 
@@ -20,7 +22,9 @@ export function decodedText(word: DecodedWord): string {
 }
 
 const HISTORY_SECONDS = 10;
-const SETTINGS_KEY = "silentspeak.settings.v1";
+const SETTINGS_KEY = "silentspeak.settings.v2";
+/** Lip vectors older than this aren't attached to a motion sample. */
+const LIP_FRESH_MS = 250;
 
 interface Settings {
   featureSet: FeatureSet;
@@ -33,10 +37,14 @@ interface Settings {
   types: boolean;
   hotkeyEnabled: boolean;
   speechRate: number;
+  /** Mouth movement on camera starts and stops a capture. */
+  lipGate: boolean;
+  /** Mouth speed that counts as moving; see engine/face.ts. */
+  gateThreshold: number;
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  featureSet: ALL_FEATURES,
+  featureSet: ALL_FEATURES | Feature.lips,
   augment: true,
   k: 3,
   maxDistance: 1.5,
@@ -45,12 +53,15 @@ const DEFAULT_SETTINGS: Settings = {
   types: false,
   hotkeyEnabled: false,
   speechRate: 1,
+  lipGate: true,
+  gateThreshold: GATE.threshold,
 };
 
 /** All app state and behaviour. Views subscribe and re-render on change. */
 export class AppModel {
   readonly bridge = new BridgeClient();
   readonly capture = new CaptureController();
+  readonly camera = new FaceTracker();
 
   screen: Screen = "train";
   dataset: Dataset;
@@ -80,6 +91,7 @@ export class AppModel {
   private frame: number | null = null;
   private rateWindow: number[] = [];
   private worker: Worker | null = null;
+  private lipsWereUsable = false;
   private statusTimer: number | null = null;
   private saveTimer: number | null = null;
   private started = false;
@@ -125,6 +137,11 @@ export class AppModel {
     };
     this.capture.onSegment = (segment) => this.handleSegment(segment);
     this.capture.onChange = () => this.markDirty();
+    this.camera.gate.threshold = this.settings.gateThreshold;
+    this.camera.onFrame = (t, lips) => this.handleCameraFrame(t, lips);
+    this.camera.onChange = () => this.cameraChanged();
+    this.camera.gate.onStart = () => { if (this.gateCaptures) this.capture.begin(); };
+    this.camera.gate.onStop = () => this.capture.end();
     this.bridge.connect();
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
@@ -142,7 +159,55 @@ export class AppModel {
     this.capture.setAutoEnabled(this.screen === "decode" && this.decodeMode === "auto");
   }
 
+  // MARK: Camera
+
+  get cameraTracking(): boolean {
+    return this.camera.status === "tracking";
+  }
+
+  /** Lip channels only count while the camera is actually seeing a face. */
+  get effectiveFeatureSet(): FeatureSet {
+    return this.cameraTracking ? this.settings.featureSet : this.settings.featureSet & ~Feature.lips;
+  }
+
+  startCamera(): void {
+    void this.camera.start();
+  }
+
+  stopCamera(): void {
+    this.camera.stop();
+  }
+
+  private get gateCaptures(): boolean {
+    if (!this.settings.lipGate || !this.cameraTracking) return false;
+    switch (this.screen) {
+      case "train": return this.selectedWord !== null;
+      case "decode": return this.decodeMode === "hold" && this.classifier !== null;
+      case "sensors": return false;
+    }
+  }
+
+  /** With no AirPods streaming, the camera is the sample stream on its own. */
+  private handleCameraFrame(t: number, lips: number[]): void {
+    if (this.bridge.motion !== "streaming") {
+      this.ingest(makeSample(t, [0, 0, 0], [0, 0, 0], [0, 0, 0], lips));
+    }
+  }
+
+  private cameraChanged(): void {
+    const usable = this.cameraTracking;
+    if (usable !== this.lipsWereUsable) {
+      this.lipsWereUsable = usable;
+      if (!usable) this.capture.end();
+      this.rebuildClassifier();
+    }
+    this.markDirty();
+  }
+
   private ingest(sample: MotionSample): void {
+    if (!sample.lips && this.cameraTracking && this.camera.latest && performance.now() - this.camera.latestAt < LIP_FRESH_MS) {
+      sample.lips = this.camera.latest;
+    }
     this.latest = sample;
     this.sampleCount++;
     this.history.push(sample);
@@ -172,6 +237,9 @@ export class AppModel {
         if (!this.classifier) return;
         const { k, maxDistance, minConfidence } = this.settings;
         const prediction = this.classifier.predict(segment, { k, maxDistance, minConfidence });
+        if (segment.every((s) => !s.lips) && (this.classifier.featureSet & Feature.lips)) {
+          this.setStatus("That segment had no camera data; lip channels were zero.");
+        }
         const best = prediction.ranked[0];
         const output = best ? outputFor(this.dataset, best.label) : "";
         this.decoded.push({ id: crypto.randomUUID(), prediction, output });
@@ -242,6 +310,7 @@ export class AppModel {
     const rebuild = (patch.featureSet !== undefined && patch.featureSet !== previous.featureSet)
       || (patch.augment !== undefined && patch.augment !== previous.augment);
     if (rebuild) this.rebuildClassifier();
+    if (patch.gateThreshold !== undefined) this.camera.gate.threshold = patch.gateThreshold;
     if (patch.k !== undefined && patch.k !== previous.k) this.evaluation = null;
     this.notify();
   }
@@ -323,7 +392,7 @@ export class AppModel {
   }
 
   private rebuildClassifier(): void {
-    this.classifier = TemplateClassifier.build(this.dataset.templates, this.settings.featureSet, this.augmentOptions);
+    this.classifier = TemplateClassifier.build(this.dataset.templates, this.effectiveFeatureSet, this.augmentOptions);
     this.evaluation = null;
   }
 

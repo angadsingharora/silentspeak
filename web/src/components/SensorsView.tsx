@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { LevelMeter, SliderField } from "./Controls";
 import { useModel } from "../useModel";
 import { ACCELERATION, ATTITUDE, ROTATION, SignalPlot } from "./SignalPlot";
 
@@ -54,6 +55,8 @@ export function SensorsView() {
         </div>
       </div>
 
+      <CameraCard />
+
       <div className="card">
         <h2>Last 8 s</h2>
         <div className="stack" style={{ gap: 12 }}>
@@ -64,6 +67,67 @@ export function SensorsView() {
       </div>
 
       <p className="small muted">Session recording to CSV/audio is only in the native app.</p>
+    </div>
+  );
+}
+
+/** Webcam preview with the lip landmarks drawn over it, plus the mouth gate controls. */
+function CameraCard() {
+  const model = useModel();
+  const cam = model.camera;
+  const holder = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const el = holder.current;
+    if (!el) return;
+    cam.video.style.width = "100%";
+    cam.video.style.display = "block";
+    el.prepend(cam.video);
+    return () => { cam.video.remove(); };
+  }, [cam]);
+
+  useEffect(() => {
+    const c = canvas.current;
+    if (!c) return;
+    const w = c.clientWidth, h = c.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    if (c.width !== w * dpr || c.height !== h * dpr) { c.width = w * dpr; c.height = h * dpr; }
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = cam.gate.isOpen ? "#c0392b" : "#fff";
+    for (const p of cam.lipPoints) ctx.fillRect(p.x * w - 1, p.y * h - 1, 2, 2);
+  });
+
+  const scale = Math.max(cam.gate.threshold * 2, 0.5);
+  return (
+    <div className="card">
+      <h2>Camera</h2>
+      <div className="row">
+        <div ref={holder} className="preview" style={{ flex: "0 0 320px", position: "relative", background: "var(--soft)", minHeight: 180 }}>
+          <canvas ref={canvas} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+        </div>
+        <div className="stack" style={{ gap: 8 }}>
+          <div className="wrap">
+            {cam.isOn
+              ? <button className="btn sm" onClick={() => model.stopCamera()}>stop</button>
+              : <button className="btn sm" onClick={() => model.startCamera()}>start camera</button>}
+            <span className="mono">{cam.status}{cam.status === "tracking" ? `, ${cam.fps} fps` : ""}</span>
+            {cam.error && <span className="small warn">{cam.error}</span>}
+          </div>
+          <LevelMeter value={cam.gate.speed / scale} marker={cam.gate.threshold / scale} tint={cam.gate.isOpen ? "red" : ""} />
+          <SliderField label="sensitivity" value={model.settings.gateThreshold} min={0.3} max={4} step={0.1} format={(v) => v.toFixed(1)} onChange={(v) => model.updateSettings({ gateThreshold: v })} />
+          <label className="check">
+            <input type="checkbox" checked={model.settings.lipGate} onChange={(e) => model.updateSettings({ lipGate: e.target.checked })} />
+            mouth movement starts and stops a capture
+          </label>
+          <p className="small muted">
+            Lip shapes from the face model become extra channels for matching (the "lips" box in Evaluate). Runs in the page; nothing is uploaded. Without AirPods the camera is the only signal, which still works.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

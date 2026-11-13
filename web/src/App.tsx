@@ -13,11 +13,16 @@ const SCREENS: { id: Screen; label: string }[] = [
 export function App() {
   const model = useModel();
   const { bridge } = model;
-  const tone = bridge.state !== "connected" ? "bad" : bridge.motion === "streaming" ? "live" : "";
-  const status = bridge.state !== "connected"
-    ? (bridge.state === "connecting" ? "connecting to bridge" : "bridge not running")
-    : bridge.motion === "streaming"
-      ? `${bridge.info?.simulated ? "simulated" : "AirPods"}, ${Math.round(model.sampleRate)} Hz`
+  const airpods = bridge.state === "connected" && bridge.motion === "streaming";
+  const camera = model.cameraTracking;
+  const tone = airpods || camera ? "live" : bridge.state === "connected" ? "" : "bad";
+  const parts: string[] = [];
+  if (airpods) parts.push(`${bridge.info?.simulated ? "simulated" : "AirPods"}, ${Math.round(model.sampleRate)} Hz`);
+  if (camera) parts.push(`camera, ${model.camera.fps} fps`);
+  const status = parts.length
+    ? parts.join(" + ")
+    : bridge.state !== "connected"
+      ? (bridge.state === "connecting" ? "connecting to bridge" : "bridge not running, camera off")
       : bridge.motion === "waiting" ? "waiting for AirPods" : bridge.motion;
 
   return (

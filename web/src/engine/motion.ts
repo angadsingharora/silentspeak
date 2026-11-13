@@ -9,6 +9,8 @@ export interface MotionSample {
   pitch: number; roll: number; yaw: number;
   /** Gravity vector (g). */
   gx: number; gy: number; gz: number;
+  /** Lip-shape blendshapes from the camera, when it was on (see face.ts). */
+  lips?: number[];
 }
 
 export function makeSample(
@@ -16,14 +18,17 @@ export function makeSample(
   rotation: [number, number, number] = [0, 0, 0],
   accel: [number, number, number] = [0, 0, 0],
   attitude: [number, number, number] = [0, 0, 0],
+  lips?: number[],
 ): MotionSample {
-  return {
+  const s: MotionSample = {
     t,
     ax: accel[0], ay: accel[1], az: accel[2],
     rx: rotation[0], ry: rotation[1], rz: rotation[2],
     pitch: attitude[0], roll: attitude[1], yaw: attitude[2],
     gx: 0, gy: 0, gz: -1,
   };
+  if (lips) s.lips = lips;
+  return s;
 }
 
 /** Decodes the bridge's compact `motion` message array. */
@@ -42,17 +47,33 @@ export const Feature = {
   acceleration: 1 << 0,
   rotation: 1 << 1,
   attitude: 1 << 2,
+  /** Camera lip shapes. */
+  lips: 1 << 3,
 } as const;
 
 export type FeatureSet = number;
+/** The three AirPods channels. */
 export const ALL_FEATURES: FeatureSet = Feature.acceleration | Feature.rotation | Feature.attitude;
+
+/** Number of lip channels a sample carries; see LIP_CHANNELS in face.ts. */
+export const LIP_DIMS = 16;
 
 export function featureNames(set: FeatureSet): string[] {
   const names: string[] = [];
   if (set & Feature.acceleration) names.push("acceleration");
   if (set & Feature.rotation) names.push("rotation");
   if (set & Feature.attitude) names.push("attitude");
+  if (set & Feature.lips) names.push("lips");
   return names;
+}
+
+/** How many leading frame dims are sensor axes in groups of three (the rest are lips). */
+export function motionDims(set: FeatureSet): number {
+  let n = 0;
+  if (set & Feature.acceleration) n += 3;
+  if (set & Feature.rotation) n += 3;
+  if (set & Feature.attitude) n += 3;
+  return n;
 }
 
 /**
@@ -100,6 +121,10 @@ export function frames(samples: MotionSample[], set: FeatureSet): number[][] {
     if (set & Feature.rotation) v.push(s.rx, s.ry, s.rz);
     if (set & Feature.attitude) {
       v.push(wrapped(s.pitch - origin.pitch), wrapped(s.roll - origin.roll), wrapped(s.yaw - origin.yaw));
+    }
+    if (set & Feature.lips) {
+      const lips = s.lips;
+      for (let i = 0; i < LIP_DIMS; i++) v.push(lips?.[i] ?? 0);
     }
     return v;
   });

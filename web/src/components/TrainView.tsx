@@ -11,14 +11,20 @@ import { ROTATION, SignalPlot } from "./SignalPlot";
 export function TrainView() {
   const model = useModel();
   const word = model.selectedWord;
-  const streaming = model.bridge.motion === "streaming";
+  const streaming = model.bridge.motion === "streaming" || model.cameraTracking;
+  const gated = model.settings.lipGate && model.cameraTracking;
 
   return (
     <div className="split">
       <Vocabulary />
       <div className="stack">
         <div className="stack" style={{ gap: 10 }}>
-          <p className="muted">Hold Space and silently mouth “{word ?? "—"}”. Keep your head still. With “extra takes” on, 3–5 per word may be enough; Evaluate will tell you.</p>
+          <p className="muted">
+            {gated
+              ? <>Silently mouth “{word ?? "—"}”; the camera starts and stops the take when your mouth moves. Or hold Space.</>
+              : <>Hold Space and silently mouth “{word ?? "—"}”. Keep your head still.</>}
+            {" "}With “extra takes” on, 3–5 per word may be enough; Evaluate will tell you.
+          </p>
           <HoldButton
             title={`Mouth “${word ?? "—"}”`}
             isCapturing={model.capture.isCapturing}
@@ -26,7 +32,7 @@ export function TrainView() {
             onBegin={() => model.capture.begin()}
             onEnd={() => model.capture.end()}
           />
-          {!streaming && <div className="notice">No motion yet ({model.bridge.state === "connected" ? model.bridge.motion : "bridge not running"}). See Sensors.</div>}
+          {!streaming && <div className="notice">No signal yet ({model.bridge.state === "connected" ? model.bridge.motion : "bridge not running"}, camera {model.camera.status}). See Sensors.</div>}
           {word && <ExpansionField word={word} />}
         </div>
         {word && <Takes word={word} />}
@@ -147,6 +153,7 @@ function EvaluationPanel() {
           <FeatureToggle label="acceleration" on={Boolean(featureSet & Feature.acceleration)} onChange={toggle(Feature.acceleration)} />
           <FeatureToggle label="rotation" on={Boolean(featureSet & Feature.rotation)} onChange={toggle(Feature.rotation)} />
           <FeatureToggle label="attitude" on={Boolean(featureSet & Feature.attitude)} onChange={toggle(Feature.attitude)} />
+          <FeatureToggle label="lips" on={Boolean(featureSet & Feature.lips)} onChange={toggle(Feature.lips)} />
           <label className="check" title="Add a few slightly varied copies of every take: tilted, louder or softer, faster or slower, with a little noise">
             <input type="checkbox" checked={augment} onChange={(e) => model.updateSettings({ augment: e.target.checked })} />
             extra takes

@@ -14,6 +14,8 @@ Browsers can't read AirPods motion, so there are two parts.
 
 The web app in `web/` does everything else: recording takes, matching, evaluation, speech, storage. It's React + Vite + TypeScript and deploys to Vercel.
 
+There's also a camera mode. The page runs MediaPipe's face landmarker on your webcam (in the page, nothing uploaded) and turns the mouth blendshapes into 16 extra channels for the matcher, and uses mouth movement to start and stop captures so you don't need to hold a key. It works on its own without AirPods, or together with them.
+
 ## Running it
 
 Bridge (needs the macOS Command Line Tools, which you likely have; `xcode-select --install` if not. No Xcode.):
@@ -38,11 +40,13 @@ Evaluate: runs leave-one-out classification and compares it to 500 runs with shu
 
 Decode: hold Space (or Right Option from any app) and mouth a word. Turn on speak or type.
 
+Camera: on the sensors tab, start the camera. Once it says tracking, mouthing a word starts and stops the take by itself (there's a sensitivity slider; the red dots on the preview mean a capture is open). Tick "lips" in Evaluate to use the lip shapes for matching. Takes recorded with the camera off have no lip data, so if you turn it on later, re-record. Camera-only with no AirPods works too; the status line says what's feeding it.
+
 `window.silentspeak` is the live model in the web app if you want to poke at it.
 
 ## How decoding works
 
-A segment is the motion while the key is held (or, in auto mode, while energy is above a calibrated noise floor). Per frame it becomes a 9-dim vector: user acceleration, rotation rate, and attitude change since the segment started, each mean-centred, with quiet frames trimmed off both ends. Channels are z-scaled over the training set.
+A segment is the motion while the key is held (or, in auto mode, while energy is above a calibrated noise floor, or, with the camera, while the mouth is moving). Per frame it becomes a 9-dim vector: user acceleration, rotation rate, and attitude change since the segment started, plus 16 lip-shape channels when the camera is on (jaw open, pucker, funnel, smile, press, and so on, left/right averaged). Each channel is mean-centred, quiet frames are trimmed off both ends, and channels are z-scaled over the training set.
 
 Matching is DTW with a Sakoe–Chiba band against every recorded take. The k nearest takes vote, weighted by 1/distance, with each word's closest take always included so the runner-up margin means something. A segment is rejected if the best distance is too large or the vote margin too small.
 

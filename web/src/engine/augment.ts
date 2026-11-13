@@ -88,10 +88,11 @@ function resample(fr: number[][], length: number): number[][] {
 
 /**
  * One perturbed copy of a take's (unscaled, mean-centred) feature frames.
- * Frames come in groups of three axes (acceleration, rotation, attitude); every group
- * gets the same tilt since they all come from the same sensor.
+ * The first `tiltDims` dims come in groups of three axes (acceleration, rotation,
+ * attitude) and every group gets the same tilt since they all come from the same
+ * sensor. Dims after that (lip shapes) only get gain and noise.
  */
-export function augmentFrames(fr: number[][], random: () => number, options: AugmentOptions = DEFAULT_AUGMENT): number[][] {
+export function augmentFrames(fr: number[][], random: () => number, options: AugmentOptions = DEFAULT_AUGMENT, tiltDims = fr[0]?.length ?? 0): number[][] {
   if (fr.length === 0) return [];
   const dims = fr[0].length;
 
@@ -99,7 +100,7 @@ export function augmentFrames(fr: number[][], random: () => number, options: Aug
   const gain = 1 + uniform(random, options.gain);
   let out = fr.map((f) => {
     const v = [...f];
-    for (let g = 0; g + 2 < dims; g += 3) {
+    for (let g = 0; g + 2 < Math.min(tiltDims, dims); g += 3) {
       const [a, b, c] = [f[g], f[g + 1], f[g + 2]];
       v[g] = m[0] * a + m[1] * b + m[2] * c;
       v[g + 1] = m[3] * a + m[4] * b + m[5] * c;
@@ -128,7 +129,7 @@ export function augmentFrames(fr: number[][], random: () => number, options: Aug
 }
 
 /** The synthetic copies for one take, reproducible from its id. */
-export function augmentations(fr: number[][], id: string, options: AugmentOptions = DEFAULT_AUGMENT): number[][][] {
+export function augmentations(fr: number[][], id: string, options: AugmentOptions = DEFAULT_AUGMENT, tiltDims = fr[0]?.length ?? 0): number[][][] {
   const random = seededRandom(hashString(id));
-  return Array.from({ length: options.copies }, () => augmentFrames(fr, random, options));
+  return Array.from({ length: options.copies }, () => augmentFrames(fr, random, options, tiltDims));
 }

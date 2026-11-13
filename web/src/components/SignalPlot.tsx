@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import type { MotionSample } from "../engine/motion";
 
+type NumericKey = { [K in keyof MotionSample]-?: MotionSample[K] extends number ? K : never }[keyof MotionSample];
+
 export interface Channel {
   name: string;
   color: string;
-  key: keyof MotionSample;
+  key: NumericKey;
 }
 
 export const ACCELERATION: Channel[] = [

@@ -20,7 +20,8 @@ export function DecodeView() {
 function Controls() {
   const model = useModel();
   const { capture, settings } = model;
-  const ready = model.classifier !== null && model.bridge.motion === "streaming";
+  const ready = model.classifier !== null && (model.bridge.motion === "streaming" || model.cameraTracking);
+  const gated = model.settings.lipGate && model.cameraTracking;
   return (
     <div className="card">
       <div className="stack" style={{ gap: 12 }}>
@@ -30,7 +31,7 @@ function Controls() {
           onChange={(m) => model.setDecodeMode(m)}
         />
         {model.decodeMode === "hold"
-          ? <HoldButton title="mouth a word" isCapturing={capture.isCapturing} enabled={ready} onBegin={() => capture.begin()} onEnd={() => capture.end()} />
+          ? <HoldButton title="mouth a word" hint={gated ? "the camera starts and stops it; or hold Space" : undefined} isCapturing={capture.isCapturing} enabled={ready} onBegin={() => capture.begin()} onEnd={() => capture.end()} />
           : <AutoControls />}
         <div className="wrap">
           <SliderField label="max distance" value={settings.maxDistance} min={0.2} max={4} step={0.05} onChange={(v) => model.updateSettings({ maxDistance: v })} />

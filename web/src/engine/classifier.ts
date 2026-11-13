@@ -1,6 +1,6 @@
 import { augmentations, type AugmentOptions } from "./augment";
 import { dtwDistance } from "./dtw";
-import { channelScales, frames, scaled, trim, type FeatureSet, type MotionSample } from "./motion";
+import { channelScales, frames, motionDims, scaled, trim, type FeatureSet, type MotionSample } from "./motion";
 
 export interface Template {
   id: string;
@@ -101,7 +101,7 @@ export class TemplateClassifier {
     const entries = templates.map((t, i) => ({ label: t.label, frames: scaled(raw[i], scales) }));
     if (augment && augment.copies > 0) {
       templates.forEach((t, i) => {
-        for (const copy of augmentations(raw[i], t.id, augment)) entries.push({ label: t.label, frames: scaled(copy, scales) });
+        for (const copy of augmentations(raw[i], t.id, augment, motionDims(featureSet))) entries.push({ label: t.label, frames: scaled(copy, scales) });
       });
     }
     return new TemplateClassifier(featureSet, entries, scales, templates.length);
